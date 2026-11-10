@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="KMP의 LPS와 Rabin–Karp의 롤링 해시를 한 단계씩 비교하는 문자열 검색 실험실">
+  <meta name="theme-color" content="#183c55">
+  <title>STRINGS LAB · KMP와 Rabin–Karp</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23183c55'/%3E%3Ctext x='7' y='28' font-family='monospace' font-size='26' fill='white'%3Eab%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="algorithms.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#explorer">탐색기로 바로 가기</a>
+  <header class="site-header wrap">
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true">ab</span> STRINGS LAB</a>
+    <nav aria-label="주 메뉴"><a href="#explorer">단계 탐색</a><a href="#comparison">결과 비교</a><a href="#theory">코드·복잡도</a></nav>
+    <span class="assignment">ALGORITHM / 주제 A</span>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" aria-labelledby="page-title">
+      <div><p class="eyebrow"><span class="live-dot"></span> STRING MATCHING, STEP BY STEP</p>
+        <h1 id="page-title">같은 문자열,<br>다른 탐색의 근거.</h1>
+        <p class="hero-copy">이미 맞춘 부분을 기억하는 <strong>KMP</strong>.<br>문자열의 숫자 지문을 옮기는 <strong>Rabin–Karp</strong>.<br class="mobile-break"> 두 알고리즘의 다음 선택을 직접 따라가 보세요.</p>
+      </div>
+      <div class="hero-figure" aria-label="ABAB 패턴의 접두사 재사용과 해시 예시">
+        <div class="figure-top"><span>ONE PATTERN. TWO IDEAS.</span><span>01 / 02</span></div>
+        <div class="hero-letters"><span>A</span><span>B</span><span>A</span><span>B</span></div>
+        <div class="hero-bracket"><span>↖ 접두사 AB = 접미사 AB ↗</span><b>LPS[3] = 2</b></div>
+        <div class="hero-hash"><span>ABAB</span><i>→</i><strong>13</strong><small>b = 256 · q = 101</small></div>
+      </div>
+    </section>
+
+    <section id="explorer" class="explorer" aria-labelledby="explorer-title">
+      <div class="section-top"><div><p class="eyebrow">01 / INTERACTIVE EXPLORER</p><h2 id="explorer-title">다음 한 단계의 이유</h2></div><span class="small-muted">인덱스는 0부터 · 겹치는 일치도 검색</span></div>
+      <div class="input-panel">
+        <div class="preset-row" role="group" aria-label="예제 선택" id="presets"></div>
+        <form id="input-form" novalidate>
+          <label class="input-label" for="text-input"><span>텍스트 <code>T</code><small id="text-count">9 / 10</small></span><input id="text-input" value="ABABCABAB" autocomplete="off" spellcheck="false" aria-describedby="input-help"></label>
+          <label class="input-label" for="pattern-input"><span>찾을 패턴 <code>P</code><small id="pattern-count">4 / 10</small></span><input id="pattern-input" value="ABAB" autocomplete="off" spellcheck="false" aria-describedby="input-help"></label>
+          <label class="mod-label" for="mod-select"><span>해시 나머지 <code>q</code></span><select id="mod-select"><option value="101">101 · 기본</option><option value="5">5 · 충돌 관찰</option></select></label>
+          <button class="button primary" type="submit">입력 적용 <span aria-hidden="true">↗</span></button>
+        </form>
+        <div class="input-help"><p id="input-help">각 문자열 1~10자 · 대소문자와 공백을 구분합니다. b = 256 고정.</p><p id="input-error" role="alert"></p></div>
+        <p id="preset-description" class="preset-description"></p>
+      </div>
+
+      <div class="workbench">
+        <div class="workbench-head">
+          <div role="tablist" aria-label="살펴볼 알고리즘" class="algorithm-tabs">
+            <button id="tab-kmp" role="tab" aria-selected="true" aria-controls="algorithm-panel" data-algorithm="kmp"><span>01</span> KMP <small>LPS 재사용</small></button>
+            <button id="tab-rk" role="tab" aria-selected="false" aria-controls="algorithm-panel" data-algorithm="rk" tabindex="-1"><span>02</span> Rabin–Karp <small>롤링 해시</small></button>
+          </div>
+          <span id="phase-badge" class="phase-badge">전처리</span>
+        </div>
+        <div id="algorithm-panel" role="tabpanel" aria-labelledby="tab-kmp" tabindex="0">
+          <div class="stage-grid">
+            <div class="visual-area">
+              <div class="viz-top"><span id="visual-caption">문자와 패턴 정렬</span><div class="legend"><span><i class="legend-current"></i>현재</span><span><i class="legend-match"></i>발견</span><span><i class="legend-mismatch"></i>불일치</span></div></div>
+              <div id="board" class="board"></div>
+              <div id="mechanism" class="mechanism"></div>
+              <div class="result-strip"><span>현재까지 발견한 시작 위치</span><strong id="current-matches">아직 없음</strong></div>
+            </div>
+            <aside class="explanation-area">
+              <div class="step-top"><span id="step-label">STEP 00</span><span id="step-fraction">0 / 0</span></div>
+              <h3 id="step-title">LPS 표 만들기</h3>
+              <p id="step-explanation" aria-live="polite" aria-atomic="true"></p>
+              <div id="variables" class="variables"></div>
+              <div class="focus-note"><span aria-hidden="true">↳</span><p id="focus-note"></p></div>
+            </aside>
+          </div>
+          <div class="transport">
+            <div class="transport-buttons"><button id="reset" class="icon-button" aria-label="처음 단계로">↺</button><button id="prev" class="button subtle">← 이전</button><button id="play" class="button primary" aria-pressed="false">▶ 재생</button><button id="next" class="button subtle">다음 →</button></div>
+            <label class="speed-label" for="speed">재생 속도<select id="speed"><option value="1000">1단계/초</option><option value="500" selected>2단계/초</option><option value="250">4단계/초</option></select></label>
+            <div class="timeline-wrap"><label class="sr-only" for="timeline">학습 단계 이동</label><input id="timeline" type="range" min="0" max="1" value="0"><span id="timeline-description">처음</span></div>
+          </div>
+          <div class="event-row"><span>바로 살펴보기</span><div id="event-buttons"></div></div>
+          <div class="code-and-stats">
+            <div class="code-panel"><div class="mini-heading"><h3>이 단계의 핵심 의사코드</h3><span id="code-line-label"></span></div><p id="code-assumption" class="small-muted"></p><ol id="pseudocode" class="pseudocode"></ol></div>
+            <div class="stats-panel"><p class="eyebrow">CURRENT COUNTERS</p><h3>현재까지 수행한 작업</h3><div id="current-stats"></div><p>문자 비교와 해시 연산은 서로 다른 작업입니다. 애니메이션 단계 수도 실행 시간을 뜻하지 않습니다.</p></div>
+          </div>
+        </div>
+        <div class="export-row"><p>알고리즘을 바꾸어도 각자의 단계 위치를 기억합니다.</p><div><button class="text-button" id="export-svg">현재 단계 SVG ↓</button><button class="text-button" id="export-json">실행 기록 JSON ↓</button></div></div>
+      </div>
+    </section>
+
+    <section id="comparison" class="comparison section-space" aria-labelledby="comparison-title">
+      <div class="section-top"><div><p class="eyebrow">02 / SAME ANSWER, DIFFERENT WORK</p><h2 id="comparison-title">정답은 같고, 수행한 일은 다릅니다.</h2></div><button id="show-results" class="text-button">두 알고리즘 완료 결과 보기 ↗</button></div>
+      <div class="summary-grid"><div class="summary-main"><span>두 알고리즘의 전체 검색 결과</span><strong id="final-matches">[0, 5]</strong><p id="agreement">같은 시작 위치를 찾았습니다.</p></div><div><span>KMP · 검색 중 문자 비교</span><strong id="kmp-comparisons">10<small>회</small></strong><p>별도로 LPS 전처리 비교 <b id="kmp-preprocess">3</b>회</p></div><div><span>Rabin–Karp · 실제 문자 검증</span><strong id="rk-comparisons">8<small>회</small></strong><p>별도로 해시 비교 <b id="rk-hashes">6</b>회 · 창 갱신 <b id="rk-rolls">5</b>회</p></div></div>
+      <p class="comparison-note" id="comparison-note"></p>
+      <div class="table-scroll"><table><caption>현재 입력을 끝까지 실행한 결과 · 화면 진행 상태와 별도</caption><thead><tr><th scope="col">비교 항목</th><th scope="col">KMP</th><th scope="col">Rabin–Karp</th></tr></thead><tbody><tr><th scope="row">후보를 처리하는 근거</th><td>일치한 접두사·접미사 길이</td><td>현재 창과 패턴의 해시 값</td></tr><tr><th scope="row">불일치 / 충돌 후 행동</th><td>j &gt; 0: i 유지, j = LPS[j−1]<br>j = 0: i를 한 칸 전진</td><td>검증에서 실패한 후보 제외 후 다음 창</td></tr><tr><th scope="row">전처리 결과</th><td id="final-lps"></td><td id="final-hash"></td></tr><tr><th scope="row">해시 충돌로 제외한 창</th><td>해시 사용 안 함</td><td id="collision-count"></td></tr></tbody></table></div>
+    </section>
+
+    <section id="theory" class="section-space theory" aria-labelledby="theory-title">
+      <p class="eyebrow">03 / UNDER THE HOOD</p><h2 id="theory-title">기억할 정보가 다르면, 다음 이동도 달라집니다.</h2>
+      <div class="idea-grid"><article><span class="idea-index">01 / KMP</span><h3>불일치 전의 정보를 남깁니다.</h3><p><code>LPS[j]</code>는 <code>P[0..j]</code>의 진접두사와 접미사가 같은 가장 긴 길이입니다. <code>ABAB</code>에서는 <code>AB</code>를 재사용하므로 마지막 값이 2입니다.</p><p>불일치가 생기면 <code>j = LPS[j−1]</code>로 더 짧은 후보를 고릅니다. 본문의 위치 <code>i</code>를 뒤로 옮길 필요가 없습니다. 일치 후에도 같은 규칙을 적용하면 겹치는 결과를 놓치지 않습니다.</p><div class="formula">AB<span class="accent-kmp">AB</span> <i>→</i> LPS = [0, 0, 1, 2]</div></article><article><span class="idea-index">02 / RABIN–KARP</span><h3>창을 옮기며 지문을 갱신합니다.</h3><p>패턴 길이만큼의 검색 창을 해시 값으로 표현합니다. 다음 창에서는 맨 앞 문자의 기여를 빼고, 자릿값을 한 칸 옮긴 뒤 새 문자를 더합니다.</p><p>해시가 같으면 실제 문자를 비교합니다. 충돌은 서로 다른 문자열이 같은 해시를 갖는 경우이므로, 이 검증을 마친 뒤에만 정답으로 기록합니다.</p><div class="formula small-formula">h′ = ((h − out × high) × b + in) mod q</div></article></div>
+      <div class="complexity-block"><div class="mini-heading"><h3>이 구현을 기준으로 한 복잡도</h3><span>n = 텍스트 길이 · m = 패턴 길이 · 1 ≤ m ≤ n</span></div><div class="table-scroll"><table><thead><tr><th>기준</th><th>KMP · LPS 방식</th><th>Rabin–Karp · 실제 문자 검증</th></tr></thead><tbody><tr><th>전처리</th><td>O(m) · LPS 구성</td><td>O(m) · 초기 해시와 high</td></tr><tr><th>전체 시간</th><td>O(n + m) · 최악에도 선형</td><td>O(n + m + vm), 최악 O(nm)</td></tr><tr><th>핵심 보조 공간</th><td>O(m) · LPS 배열</td><td>O(1) · 해시와 인덱스</td></tr><tr><th>시간이 드는 이유</th><td>i는 전진만 하고 j의 후퇴 총량도 O(n)</td><td>각 창의 해시 갱신은 O(1), 해시가 같은 v개 창은 각각 최대 m자 검증</td></tr></tbody></table></div><p><b>v는 실제 정답을 포함하여 해시가 같았던 창의 수입니다.</b> 따라서 충돌이 없어도 반복 문자열의 겹치는 정답을 모두 검증하면 O(nm)이 될 수 있습니다. 검증 비용이 O(n + m)인 입력에서는 전체도 선형입니다. 이 실험의 고정된 q = 101 또는 5만으로 평균 선형 시간을 보장하지 않습니다.</p><p class="small-muted">표는 핵심 알고리즘의 작업 공간 기준입니다. 이 웹사이트는 유니코드 입력 배열 O(n + m), 정답 O(k), 단계별 되돌리기를 위한 기록을 추가로 저장합니다. 기록 길이를 s라 하면 배열 복사 때문에 최대 O(s(n + m))의 공간을 사용하며, 이 기록 비용은 위 복잡도에서 제외했습니다.</p></div>
+    </section>
+
+    <section class="reading section-space"><div><p class="eyebrow">TRY THIS ROUTE</p><h2>세 장면을 비교해 보세요.</h2></div><ol><li><span>01</span><p><b>기본 예제 → KMP → 불일치 후 이동</b><br>i = 4를 유지하며 j가 2에서 0이 되는 순간을 확인합니다.</p></li><li><span>02</span><p><b>같은 입력 → Rabin–Karp → 첫 해시 갱신</b><br>ABAB의 해시 13에서 BABC의 해시 86을 만드는 과정을 따라갑니다.</p></li><li><span>03</span><p><b>해시 충돌 실험 → 해시 충돌</b><br>q = 5에서 AG와 AB의 지문이 같아도 정답이 다른 이유를 확인합니다.</p></li></ol></section>
+    <section class="resources"><div><h3>참고 자료</h3><p><a href="https://algs4.cs.princeton.edu/53substring/" target="_blank" rel="noopener">Princeton · Substring Search ↗</a><a href="https://algs4.cs.princeton.edu/lectures/keynote/53SubstringSearch-2x2.pdf" target="_blank" rel="noopener">KMP와 Rabin–Karp 강의 자료 ↗</a><a href="https://algs4.cs.princeton.edu/53substring/RabinKarp.java.html" target="_blank" rel="noopener">해시 일치 후 검증 구현 ↗</a></p></div><div class="resource-actions"><a class="button subtle" href="report.pdf">과제 보고서 PDF ↓</a><button id="print-page" class="text-button">현재 페이지 인쇄</button><a class="text-button" href="README.md">GitHub Pages 배포 안내 ↗</a></div></section>
+  </main>
+  <footer class="wrap"><a class="brand" href="#"><span class="brand-mark" aria-hidden="true">ab</span> STRINGS LAB</a><p>같은 문제를 푸는 두 알고리즘의 내부 동작 시각화 · 주제 A</p><small>구현·문서 초안 및 검증에 AI 도구 활용</small></footer>
+  <noscript>이 시각화는 JavaScript가 필요합니다. 아래 코드·복잡도 설명과 PDF 보고서를 이용해 주세요.</noscript>
+</body>
+</html>
