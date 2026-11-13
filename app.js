@@ -147,7 +147,9 @@
     const noWindow = algorithm === 'rk' && trace.text.length < trace.pattern.length;
     const position = boardPosition(step, trace);
     const { start } = position;
-    const windowVisible = algorithm === 'rk' && !noWindow && step.kind === 'hashReady';
+    const rolling = step.kind === 'roll';
+    const windowVisible = algorithm === 'rk' && !noWindow &&
+      (step.phase === 'search' || step.kind === 'hashReady');
     const hashBuild = algorithm === 'rk' && step.kind === 'hashBuild';
     const pointer = (index, label) => index === null ? '' :
       '<span class="board-pointer" style="--column:' + index + '" aria-hidden="true">' + label + '</span>';
@@ -161,7 +163,9 @@
       if (algorithm === 'kmp' && step.phase === 'search' && step.kind !== 'found' &&
           i >= start && i < position.i && i < start + trace.pattern.length) cls += ' reused';
       if (hashBuild && i < step.i && i < trace.pattern.length) cls += ' hash-read';
-      if (active) cls += step.equal === false ? ' current mismatch' : ' current';
+      if (rolling && i === step.previousStart) cls += ' roll-out';
+      else if (rolling && i === step.i) cls += ' roll-in';
+      else if (active && step.kind !== 'hashCompare') cls += step.equal === false ? ' current mismatch' : ' current';
       textCells += cell(ch,i,cls);
     });
     let patternCells = '';
@@ -177,6 +181,7 @@
     if (isPre && algorithm === 'kmp') note = '전처리: P 안에서만 접두사와 접미사를 비교합니다.';
     else if (noWindow) note = '패턴이 텍스트보다 길어 완전한 검색 창이 없습니다.';
     else if (step.kind === 'fallback') note = '본문 i = ' + position.i + ' 유지 · 패턴 j: ' + step.j + ' → ' + position.j;
+    else if (rolling) note = '창 시작 ' + step.previousStart + ' → ' + start + ' · 주황: T[' + step.previousStart + '] 제거 · 청록: T[' + step.i + '] 추가';
     else if (hashBuild) note = '현재 ' + (step.j + 1) + '번째 문자 · 앞서 해시에 반영한 문자는 옅게 표시';
     else if (step.phase === 'done') note = '검색 완료 · 초록색은 발견한 결과에 포함된 문자';
     else note = '패턴 정렬 시작 위치 = ' + start + ' · 공백 문자는 ␠로 표시';
@@ -206,75 +211,15 @@
     };
     if (step.phase === 'search' && previous.phase === 'search') {
       slide(board.querySelector('.pattern-cells'), before.start, after.start);
+      slide(board.querySelector('.window-outline'), before.start, after.start);
       slide(board.querySelector('.char-row:first-child .board-pointer'), before.textPointer, after.textPointer);
       slide(board.querySelector('.pattern-cells .board-pointer'), before.patternPointer, after.patternPointer);
     }
-  }
-
-  function rollingFormula({ before, outgoing, high, base, incoming, mod, after }) {
-    return '((' + before + ' − ' + outgoing + ' × ' + high + ') × ' + base +
-      ' + ' + incoming + ') mod ' + mod + ' = ' + after;
-  }
-
-  function windowVerdict(compare, latest, chars, pattern) {
-    const pair = compare.windowHash + (compare.equal ? ' = ' : ' ≠ ') + compare.patternHash;
-    if (!compare.equal) return [pair + ' → 다른 문자열', '문자 검증 없이 이 창 제외'];
-    if (latest.kind === 'found') return [
-      pair + ' → ' + chars.map(showChar).join(', ') + ' 직접 비교',
-      '모든 문자가 같아 시작 위치 ' + compare.start + ' 기록'
-    ];
-    if (latest.kind === 'collision') return [
-      pair + ' → 해시 충돌',
-      'T[' + latest.i + ']와 P[' + latest.j + ']가 달라 이 창 제외'
-    ];
-    if (latest.kind === 'verify') return [
-      pair + ' → 실제 문자 검증',
-      'T[' + latest.i + ']의 ' + showChar(chars[latest.j]) + (latest.equal ? ' = ' : ' ≠ ') +
-        'P[' + latest.j + ']의 ' + showChar(pattern[latest.j])
-    ];
-    return [pair + ' → 해시 일치', '같은 문자열인지 실제 문자를 확인합니다.'];
-  }
-
-  function windowFlowMarkup(step, trace, index) {
-    const windows = [];
-    for (const [i, event] of trace.steps.entries()) {
-      if (event.kind === 'hashCompare') {
-        windows.push({ compare: event, index: i, latest: event });
-      } else if (event.kind === 'roll') {
-        windows.at(-1).roll = { event, index: i };
-      } else if (i <= index && ['verify', 'found', 'collision'].includes(event.kind)) {
-        windows.at(-1).latest = event;
+    if (step.kind === 'roll' && before.start !== after.start) {
+      for (const cell of board.querySelectorAll('.roll-out, .roll-in')) {
+        cell.animate([{ opacity: .55 }, { opacity: 1 }], options);
       }
     }
-    if (!windows.length) return '<p class="window-empty">패턴이 본문보다 길어 완전한 검색 창이 없습니다.</p>';
-    const length = trace.pattern.length;
-    const rows = windows.map(({ compare, latest, roll, index: comparedAt }) => {
-      const { start, windowHash } = compare;
-      const chars = trace.text.slice(start, start + length);
-      const reached = comparedAt <= index || (step.kind === 'roll' && step.start === start);
-      const active = step.phase === 'search' && step.start === start;
-      const verdict = comparedAt <= index ? windowVerdict(compare, latest, chars, trace.pattern) :
-        [reached ? '해시 갱신 완료' : '비교 대기', reached ? '다음 단계에서 패턴 해시와 비교합니다.' : ''];
-      const rowClass = ['window-row', reached ? '' : 'is-pending',
-        latest.kind === 'found' ? 'is-found' : '', active ? 'is-active' : ''].join(' ');
-      const row = '<div class="' + rowClass + '" data-start="' + start + '"' +
-        (active ? ' aria-current="step"' : '') + '><div class="window-data"><div><code>s = ' + start +
-        '</code> · <strong>' + esc(chars.map(showChar).join('')) + '</strong></div>' +
-        '<code>windowHash = ' + (reached ? windowHash : '—') + '</code></div>' +
-        '<div class="window-verdict"><strong>' + esc(verdict[0]) + '</strong><span>' + esc(verdict[1]) + '</span></div></div>';
-      if (!roll) return row;
-      const visible = roll.index <= index;
-      const rolling = roll.event.rolling;
-      return row + '<div class="window-roll' + (roll.index === index ? ' is-active' : '') +
-        (visible ? '' : ' is-pending') + '" data-from="' + start + '"><span aria-hidden="true">↓</span>' +
-        (visible ? '<span>' + esc(showChar(rolling.outgoingChar)) + ' 제거 · ' + esc(showChar(rolling.incomingChar)) +
-          ' 추가</span><span aria-hidden="true">→</span><code>' + esc(rollingFormula(rolling)) + '</code>' :
-          '<span>다음 창으로 한 칸 이동</span>') +
-        '</div>';
-    });
-    const summary = step.phase === 'done' ? '<p class="window-summary">해시 비교 ' + step.stats.hashComparisons +
-      '회 · 실제 문자 비교 ' + step.stats.searchComparisons + '회 · 롤링 갱신 ' + step.stats.hashUpdates + '회</p>' : '';
-    return '<div class="window-flow" aria-label="창마다 해시를 비교하고 갱신하는 과정">' + rows.join('') + '</div>' + summary;
   }
 
   function hashCalculation(label, before, char, base, mod, after) {
@@ -326,8 +271,14 @@
       const caption = step.lookupIndex !== undefined ? '읽은 값: LPS[' + step.lookupIndex + '] = ' + step.lps[step.lookupIndex] : step.phase === 'preprocess' ? '· 아직 계산 전 / 0도 계산을 마친 값입니다.' : '일치한 부분의 접미사를 다음 후보의 접두사로 재사용합니다.';
       return '<div class="mechanism-title">LPS 배열 <span>진접두사 = 접미사인 최대 길이</span></div><div class="lps-track">' + cells + '</div><div class="lps-caption">' + esc(caption) + '</div>';
     }
+    const r = step.rolling;
     const noWindow = trace.text.length < trace.pattern.length;
-    return initialHashMarkup(step, trace, noWindow);
+    if (step.phase === 'preprocess') return initialHashMarkup(step, trace, noWindow);
+    let formula = r ? '((' + r.before + ' − ' + r.outgoing + ' × ' + r.high + ') × ' + r.base + ' + ' + r.incoming + ') mod ' + r.mod + ' = ' + r.after : 'h = (h × ' + trace.base + ' + 문자 코드 포인트) mod ' + trace.mod + ' · high = ' + trace.high;
+    if (noWindow) formula = '텍스트 길이 < 패턴 길이 · 창 해시를 비교하지 않습니다.';
+    const comparison = noWindow || r || step.phase === 'done' ? '' : '<span class="hash-equal">' + (step.patternHash === step.windowHash ? '=' : '≠') + '</span>';
+    const windowHash = noWindow ? '—' : r ? r.before + ' → ' + r.after : step.windowHash;
+    return '<div class="mechanism-title">롤링 해시 <span>b = ' + trace.base + ' · q = ' + trace.mod + ' · high = b^(m−1) mod q</span></div><div class="hash-values"><span>패턴 <strong>' + step.patternHash + '</strong></span>' + comparison + '<span>현재 창 <strong>' + windowHash + '</strong></span></div><div class="hash-formula">' + esc(formula) + '</div>';
   }
 
   function renderVariables(step, trace) {
@@ -371,7 +322,6 @@
 
   function render(previous) {
     const trace = traces[algorithm], step = current(), index = positions[algorithm], last = trace.steps.length - 1;
-    const showWindows = algorithm === 'rk' && step.phase !== 'preprocess';
     $('phase-badge').textContent = {preprocess:'전처리',search:'검색',done:'검색 완료'}[step.phase];
     $('step-label').textContent = 'STEP ' + String(index).padStart(2,'0');
     $('step-fraction').textContent = index + ' / ' + last;
@@ -381,21 +331,13 @@
     highDetails.hidden = algorithm !== 'rk' || step.kind !== 'init' || trace.text.length < trace.pattern.length;
     highDetails.innerHTML = highDetails.hidden ? '' : highMarkup(trace);
     $('focus-note').textContent = algorithm === 'kmp' ? (step.phase === 'preprocess' ? 'LPS는 패턴만 보고 미리 계산합니다. 이후 검색에서 이미 확인한 접미사를 재사용합니다.' : '이동 단계에는 현재 값과 다음 값을 함께 표시합니다. i를 뒤로 되돌리는 단계는 없습니다.') : '해시 일치는 검증할 후보라는 뜻입니다. 모든 실제 문자가 같아야 정답에 넣습니다.';
-    $('visual-caption').textContent = showWindows ? '창별 해시 비교와 갱신' : step.phase === 'preprocess' ?
+    $('visual-caption').textContent = step.phase === 'preprocess' ?
       (algorithm === 'kmp' ? '패턴 내부 전처리 · LPS 구성' : '패턴과 첫 창 · 초기 해시') : '텍스트와 패턴 · 현재 정렬';
-    $('board-legend').hidden = showWindows;
-    $('window-context').hidden = !showWindows;
-    $('window-context').textContent = showWindows ? '패턴 ' + trace.pattern.map(showChar).join('') +
-      ' · 패턴 해시 ' + step.patternHash + ' · b = ' + trace.base + ' · q = ' + trace.mod + ' · high = ' + trace.high : '';
     const scroll = $('board').querySelector('.board-scroll')?.scrollLeft || 0;
-    $('board').classList.toggle('shows-windows', showWindows);
-    $('board').innerHTML = showWindows ? windowFlowMarkup(step, trace, index) : boardMarkup(step, trace);
-    if (!showWindows) {
-      $('board').querySelector('.board-scroll').scrollLeft = scroll;
-      animateBoard(previous, step, trace);
-    }
-    $('mechanism').hidden = showWindows;
-    $('mechanism').innerHTML = showWindows ? '' : mechanismMarkup(step, trace);
+    $('board').innerHTML = boardMarkup(step,trace);
+    $('board').querySelector('.board-scroll').scrollLeft = scroll;
+    animateBoard(previous, step, trace);
+    $('mechanism').innerHTML = mechanismMarkup(step,trace);
     if (previous && step.kind === 'hashBuild' && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       for (const value of $('mechanism').querySelectorAll('.hash-calculation strong')) {
         value.animate([{ opacity: .45 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });

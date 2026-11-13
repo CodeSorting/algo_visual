@@ -44,56 +44,8 @@
 }
 .board-pointer::after { content: " ▾"; }
 .char-cell.hash-read { background: #eef4f5; border-color: #c4d7df; }
-#board-legend[hidden] { display: none; }
-#window-context { margin-top: 6px; font-size: 11px; color: var(--muted); }
-.board.shows-windows { padding-top: 13px; margin-bottom: 12px; }
-.window-row {
-  display: grid;
-  grid-template-columns: minmax(108px, 36%) minmax(0, 1fr);
-  border: 1px solid var(--line);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.window-data,
-.window-verdict { padding: 6px 9px; }
-.window-data {
-  display: grid;
-  place-content: center;
-  text-align: center;
-  background: #f0f4f6;
-  border-right: 1px solid var(--line);
-  overflow-wrap: anywhere;
-}
-.window-data strong { font-family: Consolas, "Malgun Gothic", monospace; }
-.window-verdict {
-  display: grid;
-  align-content: center;
-  overflow-wrap: anywhere;
-}
-.window-row.is-found .window-data { background: #daeee4; }
-.window-row.is-active {
-  position: relative;
-  outline: 2px solid var(--teal);
-  outline-offset: -1px;
-}
-.window-roll {
-  display: flex;
-  justify-content: center;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0 7px;
-  padding: 3px 5px;
-  color: var(--blue);
-  font-size: 11px;
-  line-height: 1.5;
-  text-align: center;
-}
-.window-roll code { overflow-wrap: anywhere; }
-.window-roll.is-active { background: #e5f1fa; font-weight: 700; }
-.window-row.is-pending,
-.window-roll.is-pending { color: var(--muted); }
-.window-empty { font-size: 12px; }
-.window-summary { margin-top: 8px; font-size: 11px; }
+.char-cell.roll-out { background: #fff0df; border: 2px solid #b46b28; }
+.char-cell.roll-in { background: #d8efeb; border: 2px solid #187b71; }
 .hash-calculation {
   display: grid;
   grid-template-columns: 3.2em minmax(0, 1fr);
@@ -113,10 +65,6 @@
   .board { --char-gap: 3px; }
   .board-scroll { padding-top: 16px; }
   .hash-calculation { font-size: 10px; }
-  .window-row { grid-template-columns: minmax(90px, 39%) minmax(0, 1fr); font-size: 11px; }
-  .window-data,
-  .window-verdict { padding-inline: 5px; }
-  .window-roll { font-size: 10px; }
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
 @media print{body{background:white;color:#132c3d;font-size:10pt}.wrap{max-width:none;padding:0}.site-header{height:50px}.site-header nav,.assignment,.hero-figure,.preset-row,#input-form,.input-help,.preset-description,.transport,.event-row,.export-row,.skip-link{display:none!important}.hero{padding:20px 0;display:block}.hero h1{font-size:28pt}.hero-copy{font-size:10pt}.hero br{display:none}h2{font-size:18pt}.stage-grid,.code-and-stats{grid-template-columns:1.4fr 1fr}.algorithm-tabs button{padding:10px;font-size:11px}.workbench,.input-panel{break-inside:avoid}.input-panel{padding:0;border:0}.visual-area{padding:14px}.explanation-area{padding:14px;border-top:0;border-left:1px solid var(--line)}:root{--cell:30px}.char-cell{height:39px;font-size:16px}.pseudocode{max-height:none;overflow:visible;font-size:8px}.code-panel{padding:12px}.stats-panel{display:block;border-left:1px solid var(--line);border-top:0;padding:14px}footer.wrap{padding:15px 0}a[href]::after{content:none}}
