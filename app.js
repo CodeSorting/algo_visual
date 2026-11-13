@@ -107,7 +107,8 @@
     activePreset = preset ? preset.id : '';
     for (const button of $('presets').children) button.setAttribute('aria-pressed', String(button.dataset.preset === activePreset));
     $('preset-description').textContent = preset ? preset.description : '직접 입력한 문자열입니다. 입력을 적용한 시점부터 두 알고리즘을 다시 실행합니다.';
-    updateSummary(); render(); return true;
+    render();
+    return true;
   }
 
   function loadPreset(preset) {
@@ -236,21 +237,6 @@
     if (index === last) stop();
   }
 
-  function updateSummary() {
-    const k = traces.kmp, r = traces.rk, ks = k.stats, rs = r.stats;
-    $('final-matches').textContent = '[' + k.matches.join(', ') + ']';
-    $('agreement').textContent = k.matches.length ? '두 알고리즘이 같은 ' + k.matches.length + '개 위치를 찾았습니다.' : '두 알고리즘 모두 일치하는 위치가 없습니다.';
-    $('kmp-comparisons').innerHTML = ks.searchComparisons + '<small>회</small>';
-    $('kmp-preprocess').textContent = ks.preprocessComparisons;
-    $('rk-comparisons').innerHTML = rs.searchComparisons + '<small>회</small>';
-    $('rk-hashes').textContent = rs.hashComparisons;
-    $('rk-rolls').textContent = rs.hashUpdates;
-    $('final-lps').textContent = 'LPS = [' + k.lps.join(', ') + ']';
-    $('final-hash').textContent = '패턴 해시 = ' + r.patternHash + ' · high = ' + r.high;
-    $('collision-count').textContent = rs.collisions + '개 창';
-    $('comparison-note').textContent = 'n = ' + k.text.length + ', m = ' + k.pattern.length + '. ' + (rs.collisions ? '해시 충돌 ' + rs.collisions + '건을 실제 문자 검증으로 제외했습니다. ' : '') + '이 수치는 현재 입력의 작업 횟수이며 속도 순위가 아닙니다. 초기 해시 구성과 high 계산도 별도의 전처리 작업입니다.';
-  }
-
   function togglePlay() {
     if (timer !== null) {stop();return;}
     if (positions[algorithm] === traces[algorithm].steps.length - 1) setPosition(0);
@@ -310,10 +296,8 @@
   $('play').addEventListener('click',togglePlay);
   $('speed').addEventListener('change',()=>{if(timer!==null){stop();togglePlay();}});
   $('timeline').addEventListener('input',event=>{stop();setPosition(Number(event.target.value));});
-  $('show-results').addEventListener('click',()=>{stop();positions={kmp:traces.kmp.steps.length-1,rk:traces.rk.steps.length-1};render();$('explorer').scrollIntoView({behavior:'smooth'});});
   $('export-svg').addEventListener('click',exportSVG);
   $('export-json').addEventListener('click',()=>{stop();download(JSON.stringify({format:'strings-lab-v1',input:{text:traces.kmp.text.join(''),pattern:traces.kmp.pattern.join(''),base:traces.rk.base,mod:traces.rk.mod},currentAlgorithm:algorithm,currentStep:positions[algorithm],traces},null,2),'application/json','strings-lab-trace.json');});
-  $('print-page').addEventListener('click',()=>{stop();window.print();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden) stop();});
   applyInput();
 })();

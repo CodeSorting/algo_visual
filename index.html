@@ -15,7 +15,7 @@
   <a class="skip-link" href="#explorer">탐색기로 바로 가기</a>
   <header class="site-header wrap">
     <a class="brand" href="#"><span class="brand-mark" aria-hidden="true">ab</span> STRINGS LAB</a>
-    <nav aria-label="주 메뉴"><a href="#explorer">단계 탐색</a><a href="#comparison">결과 비교</a><a href="#theory">코드·복잡도</a></nav>
+    <nav aria-label="주 메뉴"><a href="#explorer">단계 탐색</a></nav>
     <span class="assignment">ALGORITHM / 주제 A</span>
   </header>
 
@@ -86,23 +86,8 @@
       </div>
     </section>
 
-    <section id="comparison" class="comparison section-space" aria-labelledby="comparison-title">
-      <div class="section-top"><div><p class="eyebrow">02 / SAME ANSWER, DIFFERENT WORK</p><h2 id="comparison-title">정답은 같고, 수행한 일은 다릅니다.</h2></div><button id="show-results" class="text-button">두 알고리즘 완료 결과 보기 ↗</button></div>
-      <div class="summary-grid"><div class="summary-main"><span>두 알고리즘의 전체 검색 결과</span><strong id="final-matches">[0, 5]</strong><p id="agreement">같은 시작 위치를 찾았습니다.</p></div><div><span>KMP · 검색 중 문자 비교</span><strong id="kmp-comparisons">10<small>회</small></strong><p>별도로 LPS 전처리 비교 <b id="kmp-preprocess">3</b>회</p></div><div><span>Rabin–Karp · 실제 문자 검증</span><strong id="rk-comparisons">8<small>회</small></strong><p>별도로 해시 비교 <b id="rk-hashes">6</b>회 · 창 갱신 <b id="rk-rolls">5</b>회</p></div></div>
-      <p class="comparison-note" id="comparison-note"></p>
-      <div class="table-scroll"><table><caption>현재 입력을 끝까지 실행한 결과 · 화면 진행 상태와 별도</caption><thead><tr><th scope="col">비교 항목</th><th scope="col">KMP</th><th scope="col">Rabin–Karp</th></tr></thead><tbody><tr><th scope="row">후보를 처리하는 근거</th><td>일치한 접두사·접미사 길이</td><td>현재 창과 패턴의 해시 값</td></tr><tr><th scope="row">불일치 / 충돌 후 행동</th><td>j &gt; 0: i 유지, j = LPS[j−1]<br>j = 0: i를 한 칸 전진</td><td>검증에서 실패한 후보 제외 후 다음 창</td></tr><tr><th scope="row">전처리 결과</th><td id="final-lps"></td><td id="final-hash"></td></tr><tr><th scope="row">해시 충돌로 제외한 창</th><td>해시 사용 안 함</td><td id="collision-count"></td></tr></tbody></table></div>
-    </section>
-
-    <section id="theory" class="section-space theory" aria-labelledby="theory-title">
-      <p class="eyebrow">03 / UNDER THE HOOD</p><h2 id="theory-title">기억할 정보가 다르면, 다음 이동도 달라집니다.</h2>
-      <div class="idea-grid"><article><span class="idea-index">01 / KMP</span><h3>불일치 전의 정보를 남깁니다.</h3><p><code>LPS[j]</code>는 <code>P[0..j]</code>의 진접두사와 접미사가 같은 가장 긴 길이입니다. <code>ABAB</code>에서는 <code>AB</code>를 재사용하므로 마지막 값이 2입니다.</p><p>불일치가 생기면 <code>j = LPS[j−1]</code>로 더 짧은 후보를 고릅니다. 본문의 위치 <code>i</code>를 뒤로 옮길 필요가 없습니다. 일치 후에도 같은 규칙을 적용하면 겹치는 결과를 놓치지 않습니다.</p><div class="formula">AB<span class="accent-kmp">AB</span> <i>→</i> LPS = [0, 0, 1, 2]</div></article><article><span class="idea-index">02 / RABIN–KARP</span><h3>창을 옮기며 지문을 갱신합니다.</h3><p>패턴 길이만큼의 검색 창을 해시 값으로 표현합니다. 다음 창에서는 맨 앞 문자의 기여를 빼고, 자릿값을 한 칸 옮긴 뒤 새 문자를 더합니다.</p><p>해시가 같으면 실제 문자를 비교합니다. 충돌은 서로 다른 문자열이 같은 해시를 갖는 경우이므로, 이 검증을 마친 뒤에만 정답으로 기록합니다.</p><div class="formula small-formula">h′ = ((h − out × high) × b + in) mod q</div></article></div>
-      <div class="complexity-block"><div class="mini-heading"><h3>이 구현을 기준으로 한 복잡도</h3><span>n = 텍스트 길이 · m = 패턴 길이 · 1 ≤ m ≤ n</span></div><div class="table-scroll"><table><thead><tr><th>기준</th><th>KMP · LPS 방식</th><th>Rabin–Karp · 실제 문자 검증</th></tr></thead><tbody><tr><th>전처리</th><td>O(m) · LPS 구성</td><td>O(m) · 초기 해시와 high</td></tr><tr><th>전체 시간</th><td>O(n + m) · 최악에도 선형</td><td>O(n + m + vm), 최악 O(nm)</td></tr><tr><th>핵심 보조 공간</th><td>O(m) · LPS 배열</td><td>O(1) · 해시와 인덱스</td></tr><tr><th>시간이 드는 이유</th><td>i는 전진만 하고 j의 후퇴 총량도 O(n)</td><td>각 창의 해시 갱신은 O(1), 해시가 같은 v개 창은 각각 최대 m자 검증</td></tr></tbody></table></div><p><b>v는 실제 정답을 포함하여 해시가 같았던 창의 수입니다.</b> 따라서 충돌이 없어도 반복 문자열의 겹치는 정답을 모두 검증하면 O(nm)이 될 수 있습니다. 검증 비용이 O(n + m)인 입력에서는 전체도 선형입니다. 이 실험의 고정된 q = 101 또는 5만으로 평균 선형 시간을 보장하지 않습니다.</p><p class="small-muted">표는 핵심 알고리즘의 작업 공간 기준입니다. 이 웹사이트는 유니코드 입력 배열 O(n + m), 정답 O(k), 단계별 되돌리기를 위한 기록을 추가로 저장합니다. 기록 길이를 s라 하면 배열 복사 때문에 최대 O(s(n + m))의 공간을 사용하며, 이 기록 비용은 위 복잡도에서 제외했습니다.</p></div>
-    </section>
-
-    <section class="reading section-space"><div><p class="eyebrow">TRY THIS ROUTE</p><h2>세 장면을 비교해 보세요.</h2></div><ol><li><span>01</span><p><b>기본 예제 → KMP → 불일치 후 이동</b><br>i = 4를 유지하며 j가 2에서 0이 되는 순간을 확인합니다.</p></li><li><span>02</span><p><b>같은 입력 → Rabin–Karp → 첫 해시 갱신</b><br>ABAB의 해시 13에서 BABC의 해시 86을 만드는 과정을 따라갑니다.</p></li><li><span>03</span><p><b>해시 충돌 실험 → 해시 충돌</b><br>q = 5에서 AG와 AB의 지문이 같아도 정답이 다른 이유를 확인합니다.</p></li></ol></section>
-    <section class="resources"><div><h3>참고 자료</h3><p><a href="https://algs4.cs.princeton.edu/53substring/" target="_blank" rel="noopener">Princeton · Substring Search ↗</a><a href="https://algs4.cs.princeton.edu/lectures/keynote/53SubstringSearch-2x2.pdf" target="_blank" rel="noopener">KMP와 Rabin–Karp 강의 자료 ↗</a><a href="https://algs4.cs.princeton.edu/53substring/RabinKarp.java.html" target="_blank" rel="noopener">해시 일치 후 검증 구현 ↗</a></p></div><div class="resource-actions"><a class="button subtle" href="report.pdf">과제 보고서 PDF ↓</a><button id="print-page" class="text-button">현재 페이지 인쇄</button><a class="text-button" href="README.md">GitHub Pages 배포 안내 ↗</a></div></section>
   </main>
   <footer class="wrap"><a class="brand" href="#"><span class="brand-mark" aria-hidden="true">ab</span> STRINGS LAB</a><p>같은 문제를 푸는 두 알고리즘의 내부 동작 시각화 · 주제 A</p><small>구현·문서 초안 및 검증에 AI 도구 활용</small></footer>
-  <noscript>이 시각화는 JavaScript가 필요합니다. 아래 코드·복잡도 설명과 PDF 보고서를 이용해 주세요.</noscript>
+  <noscript>JavaScript를 켜면 문자열 검색 과정을 단계별로 살펴볼 수 있습니다.</noscript>
 </body>
 </html>

@@ -51,12 +51,11 @@ Rabin–Karp의 기본 설정은 b=256, q=101이고 충돌 예제는 q=5입니�
 
 | 파일 | 역할 |
 | --- | --- |
-| `index.html` | 입력·단계 탐색·설명·비교표 화면 |
+| `index.html` | 입력·단계 탐색·설명 화면 |
 | `styles.css` | 화면과 인쇄 레이아웃 |
 | `app.js` | 화면 조작과 단계 렌더링, 내보내기 |
 | `algorithms.js` | KMP·Rabin–Karp 실행 및 단계 기록 |
 | `tests/algorithms.test.cjs` | 독립적인 정답 대조와 경계 조건 검증 |
-| `report.pdf` | 핵심 의사코드·복잡도·단계별 그림이 포함된 과제 보고서 |
 | `.nojekyll` | GitHub Pages에서 정적 파일 그대로 제공하도록 표시 |
 
 ## 집계와 복잡도를 읽는 기준
