@@ -75,9 +75,11 @@
     render();
   }
 
-  function setPosition(index) {
+  function setPosition(index, animate = false) {
+    const previous = current();
+    const oldIndex = positions[algorithm];
     positions[algorithm] = Math.max(0, Math.min(index, traces[algorithm].steps.length - 1));
-    render();
+    render(animate && Math.abs(positions[algorithm] - oldIndex) === 1 ? previous : null);
   }
 
   function updateInputCounts() {
@@ -123,37 +125,144 @@
     return '<div class="char-cell ' + classes + '" aria-label="인덱스 ' + index + ', ' + esc(char === ' ' ? '공백' : char) + '"><small>' + index + '</small><span>' + esc(showChar(char)) + '</span></div>';
   }
 
+  function boardPosition(step, trace) {
+    const moving = algorithm === 'kmp' && ['match', 'advance', 'fallback'].includes(step.kind);
+    const i = moving ? step.nextI : step.i;
+    const j = moving ? step.nextJ : step.j;
+    const start = step.phase === 'preprocess' ? 0 : Math.max(0, moving ? i - j : step.start);
+    const compare = algorithm === 'kmp' && step.phase === 'search' &&
+      (moving || ['compare', 'mismatch', 'searchStart'].includes(step.kind));
+    return {
+      start,
+      i,
+      j,
+      compare,
+      textPointer: compare && i < trace.text.length && j < trace.pattern.length ? i : null,
+      patternPointer: compare && i < trace.text.length && j < trace.pattern.length ? j : null
+    };
+  }
+
   function boardMarkup(step, trace) {
     const isPre = step.phase === 'preprocess';
     const noWindow = algorithm === 'rk' && trace.text.length < trace.pattern.length;
-    const start = isPre ? 0 : Math.max(0, step.start);
+    const position = boardPosition(step, trace);
+    const { start } = position;
+    const rolling = step.kind === 'roll';
+    const windowVisible = algorithm === 'rk' && !noWindow &&
+      (step.phase === 'search' || step.kind === 'hashReady');
+    const hashBuild = algorithm === 'rk' && step.kind === 'hashBuild';
+    const pointer = (index, label) => index === null ? '' :
+      '<span class="board-pointer" style="--column:' + index + '" aria-hidden="true">' + label + '</span>';
     let textCells = '';
     trace.text.forEach((ch, i) => {
       let cls = '';
-      const active = step.activeText.includes(i);
+      const active = position.compare ? i === position.textPointer : step.activeText.includes(i);
       const found = step.matches.some(s => i >= s && i < s + trace.pattern.length);
       if (found && (algorithm === 'kmp' || !active || step.kind === 'found')) cls += ' found';
-      if (algorithm === 'rk' && !isPre && !noWindow && step.phase !== 'done' && i >= start && i < start + trace.pattern.length) cls += ' hash-window';
-      if (algorithm === 'kmp' && step.phase === 'search' && step.kind !== 'found' && i >= start && i < step.i && i < start + trace.pattern.length) cls += ' reused';
-      if (active) cls += step.equal === false ? ' current mismatch' : ' current';
+      if (windowVisible && i >= start && i < start + trace.pattern.length) cls += ' hash-window';
+      if (algorithm === 'kmp' && step.phase === 'search' && step.kind !== 'found' &&
+          i >= start && i < position.i && i < start + trace.pattern.length) cls += ' reused';
+      if (hashBuild && i < step.i && i < trace.pattern.length) cls += ' hash-read';
+      if (rolling && i === step.previousStart) cls += ' roll-out';
+      else if (rolling && i === step.i) cls += ' roll-in';
+      else if (active && step.kind !== 'hashCompare') cls += step.equal === false ? ' current mismatch' : ' current';
       textCells += cell(ch,i,cls);
     });
     let patternCells = '';
-    for (let k = 0; k < start; k++) patternCells += '<div class="char-cell empty" aria-hidden="true"></div>';
     trace.pattern.forEach((ch, j) => {
       let cls = '';
-      if (step.activePattern.includes(j)) cls += step.equal === false ? ' current mismatch' : ' current';
+      if (hashBuild && j < step.j) cls += ' hash-read';
+      const active = position.compare ? j === position.patternPointer : step.activePattern.includes(j);
+      if (active) cls += step.equal === false ? ' current mismatch' : ' current';
       if (step.kind === 'found') cls += ' found';
       patternCells += cell(ch,j,cls);
     });
     let note = '';
     if (isPre && algorithm === 'kmp') note = '전처리: P 안에서만 접두사와 접미사를 비교합니다.';
     else if (noWindow) note = '패턴이 텍스트보다 길어 완전한 검색 창이 없습니다.';
-    else if (step.kind === 'fallback') note = 'i = ' + step.i + ' 유지 · j: ' + step.j + ' → ' + step.nextJ + ' · 정렬은 이동 후 기준';
-    else if (step.kind === 'roll') note = '창 시작: ' + step.previousStart + ' → ' + step.start + ' · 파란 칸은 나간 문자와 들어온 문자';
+    else if (step.kind === 'fallback') note = '본문 i = ' + position.i + ' 유지 · 패턴 j: ' + step.j + ' → ' + position.j;
+    else if (rolling) note = '창 시작 ' + step.previousStart + ' → ' + start + ' · 주황: T[' + step.previousStart + '] 제거 · 청록: T[' + step.i + '] 추가';
+    else if (hashBuild) note = '현재 ' + (step.j + 1) + '번째 문자 · 앞서 해시에 반영한 문자는 옅게 표시';
     else if (step.phase === 'done') note = '검색 완료 · 초록색은 발견한 결과에 포함된 문자';
     else note = '패턴 정렬 시작 위치 = ' + start + ' · 공백 문자는 ␠로 표시';
-    return '<div class="char-row"><span class="row-label">T</span><div class="char-track">' + textCells + '</div></div><div class="char-row"><span class="row-label">P</span><div class="char-track">' + patternCells + '</div></div><div class="board-note">' + esc(note) + '</div>';
+    const outline = windowVisible ?
+      '<span class="window-outline" style="--column:' + start + ';--count:' + trace.pattern.length + '" aria-hidden="true"></span>' : '';
+    return '<div class="board-scroll"><div class="char-row"><span class="row-label">T</span><div class="char-track">' +
+      textCells + outline + pointer(position.textPointer, 'i') + '</div></div>' +
+      '<div class="char-row"><span class="row-label">P</span><div class="char-track"><div class="pattern-cells" style="grid-column:' +
+      (start + 1) + ' / span ' + trace.pattern.length + '">' + patternCells + pointer(position.patternPointer, 'j') +
+      '</div></div></div></div><div class="board-note">' + esc(note) + '</div>';
+  }
+
+  function animateBoard(previous, step, trace) {
+    if (!previous || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const before = boardPosition(previous, trace);
+    const after = boardPosition(step, trace);
+    const board = $('board');
+    const track = board.querySelector('.char-track');
+    const cellWidth = track.firstElementChild.offsetWidth;
+    const pitch = cellWidth + parseFloat(getComputedStyle(track).columnGap);
+    const options = { duration: 185, easing: 'cubic-bezier(.22,.7,.3,1)' };
+    const slide = (element, from, to) => {
+      if (element && from !== null && to !== null && from !== to) {
+        element.animate([{ transform: 'translateX(' + ((from - to) * pitch) + 'px)' },
+          { transform: 'translateX(0)' }], options);
+      }
+    };
+    if (step.phase === 'search' && previous.phase === 'search') {
+      slide(board.querySelector('.pattern-cells'), before.start, after.start);
+      slide(board.querySelector('.window-outline'), before.start, after.start);
+      slide(board.querySelector('.char-row:first-child .board-pointer'), before.textPointer, after.textPointer);
+      slide(board.querySelector('.pattern-cells .board-pointer'), before.patternPointer, after.patternPointer);
+    }
+    if (step.kind === 'roll' && before.start !== after.start) {
+      for (const cell of board.querySelectorAll('.roll-out, .roll-in')) {
+        cell.animate([{ opacity: .55 }, { opacity: 1 }], options);
+      }
+    }
+  }
+
+  function hashCalculation(label, before, char, base, mod, after) {
+    const code = char.codePointAt(0);
+    return '<div class="hash-calculation"><span>' + label + '</span><code>(' + before + ' × ' + base +
+      ' + ' + code + ') mod ' + mod + ' = <strong>' + after + '</strong> <span class="hash-character">(' +
+      esc(showChar(char)) + ' = ' + code + ')</span></code></div>';
+  }
+
+  function initialHashMarkup(step, trace, noWindow) {
+    const count = step.kind === 'hashReady' ? trace.pattern.length : step.kind === 'hashBuild' ? step.j + 1 : 0;
+    const heading = '<div class="mechanism-title">초기 해시 <span>' + count + ' / ' + trace.pattern.length +
+      '자 · b = ' + trace.base + ' · q = ' + trace.mod + '</span></div>';
+    if (step.kind === 'hashBuild') {
+      const pattern = hashCalculation('패턴', step.previousPatternHash, trace.pattern[step.j], trace.base, trace.mod, step.patternHash);
+      const firstWindow = noWindow ? '<div class="hash-calculation"><span>첫 창</span><span>완전한 창 없음</span></div>' :
+        hashCalculation('첫 창', step.previousWindowHash, trace.text[step.j], trace.base, trace.mod, step.windowHash);
+      return heading + pattern + firstWindow;
+    }
+    const values = '<div class="hash-values"><span>패턴 <strong>' + step.patternHash +
+      '</strong></span><span>첫 창 <strong>' + (noWindow ? '—' : step.windowHash) + '</strong></span></div>';
+    if (step.kind === 'hashReady') {
+      return heading + values + '<div class="hash-formula">' + (noWindow ? '완전한 창이 없어 검색을 종료합니다.' : '초기 해시 계산 완료 · 다음 단계에서 첫 창과 비교합니다.') + '</div>';
+    }
+    return heading + values + '<div class="hash-formula">패턴과 첫 창의 해시를 0으로 시작합니다.</div>';
+  }
+
+  function highMarkup(trace) {
+    const exponent = trace.pattern.length - 1;
+    const { base, mod } = trace;
+    let value = 1;
+    const equations = [base + '^0 mod ' + mod + ' = 1'];
+    for (let k = 1; k <= exponent; k++) {
+      const next = (value * base) % mod;
+      equations.push('(' + value + ' × ' + base + ') mod ' + mod + ' = ' + next);
+      value = next;
+    }
+    const explanation = '길이 ' + trace.pattern.length + '인 창의 첫 문자 뒤에 ' + exponent +
+      '자가 있으므로 첫 문자의 자릿값은 ' + base + '^' + exponent + '입니다.';
+    return '<p>' + explanation + '</p><ol class="high-calculations">' +
+      equations.map(equation => '<li><code>' + equation + '</code></li>').join('') +
+      '</ol><p class="high-purpose">high = ' + trace.high +
+      '를 저장합니다. 창을 옮길 때 기존 해시에서 첫 문자 코드 × high를 빼면 그 문자의 기여를 없앨 수 있습니다.</p>';
   }
 
   function mechanismMarkup(step, trace) {
@@ -164,10 +273,11 @@
     }
     const r = step.rolling;
     const noWindow = trace.text.length < trace.pattern.length;
+    if (step.phase === 'preprocess') return initialHashMarkup(step, trace, noWindow);
     let formula = r ? '((' + r.before + ' − ' + r.outgoing + ' × ' + r.high + ') × ' + r.base + ' + ' + r.incoming + ') mod ' + r.mod + ' = ' + r.after : 'h = (h × ' + trace.base + ' + 문자 코드 포인트) mod ' + trace.mod + ' · high = ' + trace.high;
     if (noWindow) formula = '텍스트 길이 < 패턴 길이 · 창 해시를 비교하지 않습니다.';
-    const comparison = noWindow ? '' : '<span class="hash-equal">' + (step.patternHash === step.windowHash ? '=' : '≠') + '</span>';
-    const windowHash = noWindow ? '—' : step.windowHash;
+    const comparison = noWindow || r || step.phase === 'done' ? '' : '<span class="hash-equal">' + (step.patternHash === step.windowHash ? '=' : '≠') + '</span>';
+    const windowHash = noWindow ? '—' : r ? r.before + ' → ' + r.after : step.windowHash;
     return '<div class="mechanism-title">롤링 해시 <span>b = ' + trace.base + ' · q = ' + trace.mod + ' · high = b^(m−1) mod q</span></div><div class="hash-values"><span>패턴 <strong>' + step.patternHash + '</strong></span>' + comparison + '<span>현재 창 <strong>' + windowHash + '</strong></span></div><div class="hash-formula">' + esc(formula) + '</div>';
   }
 
@@ -180,7 +290,8 @@
       values = [['i',step.i],['j',step.j]];
       if (step.nextI !== undefined) values.push(['다음 i',step.nextI],['다음 j',step.nextJ]);
     } else {
-      values = [['start',step.start],['검증 j',step.j],['q',trace.mod],['high',trace.high]];
+      values = step.phase === 'preprocess' ? [['q',trace.mod],['high',trace.high]] :
+        [['start',step.start],['검증 j',step.j],['q',trace.mod],['high',trace.high]];
     }
     $('variables').innerHTML = values.map(([name,value]) => '<span class="variable">' + esc(name) + ' = <b>' + esc(value) + '</b></span>').join('');
   }
@@ -209,17 +320,29 @@
     ];
   }
 
-  function render() {
+  function render(previous) {
     const trace = traces[algorithm], step = current(), index = positions[algorithm], last = trace.steps.length - 1;
     $('phase-badge').textContent = {preprocess:'전처리',search:'검색',done:'검색 완료'}[step.phase];
     $('step-label').textContent = 'STEP ' + String(index).padStart(2,'0');
     $('step-fraction').textContent = index + ' / ' + last;
     $('step-title').textContent = step.title;
     $('step-explanation').textContent = step.explanation;
+    const highDetails = $('high-explanation');
+    highDetails.hidden = algorithm !== 'rk' || step.kind !== 'init' || trace.text.length < trace.pattern.length;
+    highDetails.innerHTML = highDetails.hidden ? '' : highMarkup(trace);
     $('focus-note').textContent = algorithm === 'kmp' ? (step.phase === 'preprocess' ? 'LPS는 패턴만 보고 미리 계산합니다. 이후 검색에서 이미 확인한 접미사를 재사용합니다.' : '이동 단계에는 현재 값과 다음 값을 함께 표시합니다. i를 뒤로 되돌리는 단계는 없습니다.') : '해시 일치는 검증할 후보라는 뜻입니다. 모든 실제 문자가 같아야 정답에 넣습니다.';
-    $('visual-caption').textContent = step.phase === 'preprocess' && algorithm === 'kmp' ? '패턴 내부 전처리 · LPS 구성' : '텍스트와 패턴 · 현재 정렬';
+    $('visual-caption').textContent = step.phase === 'preprocess' ?
+      (algorithm === 'kmp' ? '패턴 내부 전처리 · LPS 구성' : '패턴과 첫 창 · 초기 해시') : '텍스트와 패턴 · 현재 정렬';
+    const scroll = $('board').querySelector('.board-scroll')?.scrollLeft || 0;
     $('board').innerHTML = boardMarkup(step,trace);
+    $('board').querySelector('.board-scroll').scrollLeft = scroll;
+    animateBoard(previous, step, trace);
     $('mechanism').innerHTML = mechanismMarkup(step,trace);
+    if (previous && step.kind === 'hashBuild' && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (const value of $('mechanism').querySelectorAll('.hash-calculation strong')) {
+        value.animate([{ opacity: .45 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      }
+    }
     $('current-matches').textContent = step.matches.length ? '[' + step.matches.join(', ') + ']' : step.phase === 'done' ? '일치 없음 []' : '아직 없음';
     $('prev').disabled = index === 0;
     $('next').disabled = index === last;
@@ -246,7 +369,7 @@
     if (positions[algorithm] === traces[algorithm].steps.length - 1) setPosition(0);
     $('play').textContent = 'Ⅱ 일시정지';
     $('play').setAttribute('aria-pressed','true');
-    timer = window.setInterval(()=>setPosition(positions[algorithm]+1),Number($('speed').value));
+    timer = window.setInterval(()=>setPosition(positions[algorithm]+1, true),Number($('speed').value));
   }
 
   function download(content,type,name) {
@@ -258,13 +381,15 @@
 
   function exportSVG() {
     stop();
-    const step = current(), trace = traces[algorithm], width = Math.max(1060, 127 + (Math.max(trace.text.length, (step.phase === 'preprocess' ? 0 : Math.max(0,step.start)) + trace.pattern.length)) * 50), height = 535;
+    const step = current(), trace = traces[algorithm], position = boardPosition(step, trace);
+    const width = Math.max(1060, 127 + Math.max(trace.text.length, position.start + trace.pattern.length) * 50), height = 535;
     let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 '+width+' '+height+'"><rect width="100%" height="100%" fill="#fafbf9"/><g font-family="Malgun Gothic,Arial,sans-serif" fill="#173a52"><text x="42" y="39" font-size="13" letter-spacing="2">STRINGS LAB / '+ (algorithm === 'kmp' ? 'KMP' : 'RABIN–KARP') +'</text><text x="42" y="79" font-size="24" font-weight="bold">STEP '+String(positions[algorithm]).padStart(2,'0')+' · '+esc(step.title)+'</text>';
-    const size=45,gap=5,left=85,start=step.phase === 'preprocess' ? 0 : Math.max(0,step.start);
+    const size=45,gap=5,left=85,start=position.start;
     const row=(chars,y,offset,label)=>{
       svg+='<text x="43" y="'+(y+33)+'" font-size="20">'+label+'</text>';
       chars.forEach((ch,i)=>{
-        const active=(label==='T'?step.activeText:step.activePattern).includes(i);
+        const pointer = label === 'T' ? position.textPointer : position.patternPointer;
+        const active = position.compare ? i === pointer : (label === 'T' ? step.activeText : step.activePattern).includes(i);
         const fill=active?(step.equal===false?'#fae9e3':'#e5f1fa'):'#fff';
         const x=left+(i+offset)*(size+gap);
         svg+='<rect x="'+x+'" y="'+y+'" width="'+size+'" height="52" rx="5" fill="'+fill+'" stroke="#b4c8d0"/><text x="'+(x+size/2)+'" y="'+(y+13)+'" text-anchor="middle" font-size="9" fill="#667984">'+i+'</text><text x="'+(x+size/2)+'" y="'+(y+40)+'" text-anchor="middle" font-size="22">'+esc(showChar(ch))+'</text>';
@@ -295,8 +420,8 @@
       $('tab-'+algorithm).focus();
     }
   });
-  $('prev').addEventListener('click',()=>{stop();setPosition(positions[algorithm]-1);});
-  $('next').addEventListener('click',()=>{stop();setPosition(positions[algorithm]+1);});
+  $('prev').addEventListener('click',()=>{stop();setPosition(positions[algorithm]-1, true);});
+  $('next').addEventListener('click',()=>{stop();setPosition(positions[algorithm]+1, true);});
   $('reset').addEventListener('click',()=>{stop();setPosition(0);});
   $('play').addEventListener('click',togglePlay);
   $('speed').addEventListener('change',()=>{if(timer!==null){stop();togglePlay();}});

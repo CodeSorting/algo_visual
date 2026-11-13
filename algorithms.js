@@ -153,15 +153,18 @@
       }, details || {}));
     }
     add('preprocess', 'init', '문자열을 숫자 지문으로',
-      `유니코드 코드 포인트 값을 사용해 h = (h × ${base} + 문자 값) mod ${mod}로 해시를 만듭니다. high = ${base}^${m - 1} mod ${mod} = ${high}입니다.`);
+      t.length >= m
+        ? '패턴과 첫 창을 왼쪽부터 한 글자씩 읽습니다. 새 문자를 읽을 때마다 기존 해시에 밑을 곱하고 문자 코드값을 더한 뒤 나머지를 구합니다.'
+        : '패턴의 해시를 계산합니다. 텍스트가 패턴보다 짧으므로 완전한 검색 창이 없습니다.');
     for (let k = 0; k < m; k += 1) {
       const previousPattern = patternHash;
       const previousWindow = windowHash;
       patternHash = (patternHash * base + code(p[k])) % mod;
       if (k < t.length) windowHash = (windowHash * base + code(t[k])) % mod;
       add('preprocess', 'hashBuild', `초기 해시 · ${k + 1}/${m}`,
-        `패턴: (${previousPattern} × ${base} + ${code(p[k])}) mod ${mod} = ${patternHash}. ` +
-        (k < t.length ? `텍스트: (${previousWindow} × ${base} + ${code(t[k])}) mod ${mod} = ${windowHash}.` : '텍스트가 패턴보다 짧아 완전한 검색 창을 만들 수 없습니다.'),
+        t.length >= m
+          ? `패턴과 첫 창의 ${k + 1}번째 문자를 읽어 두 해시를 갱신합니다.`
+          : `패턴의 ${k + 1}번째 문자를 읽어 패턴 해시를 갱신합니다.`,
         { i: k, j: k, activeText: k < t.length ? [k] : [], activePattern: [k], previousPatternHash: previousPattern, previousWindowHash: previousWindow });
     }
     add('preprocess', 'hashReady', '초기 해시 준비 완료',
