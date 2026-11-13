@@ -7,9 +7,9 @@
   <meta name="theme-color" content="#183c55">
   <title>STRINGS LAB · KMP와 Rabin–Karp</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23183c55'/%3E%3Ctext x='7' y='28' font-family='monospace' font-size='26' fill='white'%3Eab%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=window-flow">
   <script src="algorithms.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="app.js?v=window-flow" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#explorer">탐색기로 바로 가기</a>
@@ -58,7 +58,8 @@
         <div id="algorithm-panel" role="tabpanel" aria-labelledby="tab-kmp" tabindex="0">
           <div class="stage-grid">
             <div class="visual-area">
-              <div class="viz-top"><span id="visual-caption">문자와 패턴 정렬</span><div class="legend"><span><i class="legend-current"></i>현재</span><span><i class="legend-match"></i>발견</span><span><i class="legend-mismatch"></i>불일치</span></div></div>
+              <div class="viz-top"><span id="visual-caption">문자와 패턴 정렬</span><div id="board-legend" class="legend"><span><i class="legend-current"></i>현재</span><span><i class="legend-match"></i>발견</span><span><i class="legend-mismatch"></i>불일치</span></div></div>
+              <p id="window-context" hidden></p>
               <div id="board" class="board"></div>
               <div id="mechanism" class="mechanism"></div>
               <div class="result-strip"><span>현재까지 발견한 시작 위치</span><strong id="current-matches">아직 없음</strong></div>
