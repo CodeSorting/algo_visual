@@ -130,11 +130,12 @@
     let textCells = '';
     trace.text.forEach((ch, i) => {
       let cls = '';
-      if (step.matches.some(s => i >= s && i < s + trace.pattern.length)) cls += ' found';
+      const active = step.activeText.includes(i);
+      const found = step.matches.some(s => i >= s && i < s + trace.pattern.length);
+      if (found && (algorithm === 'kmp' || !active || step.kind === 'found')) cls += ' found';
       if (algorithm === 'rk' && !isPre && !noWindow && step.phase !== 'done' && i >= start && i < start + trace.pattern.length) cls += ' hash-window';
       if (algorithm === 'kmp' && step.phase === 'search' && step.kind !== 'found' && i >= start && i < step.i && i < start + trace.pattern.length) cls += ' reused';
-      if (step.activeText.includes(i)) cls += step.equal === false ? ' current mismatch' : ' current';
-      if (step.kind === 'found' && step.activeText.includes(i)) cls += ' found';
+      if (active) cls += step.equal === false ? ' current mismatch' : ' current';
       textCells += cell(ch,i,cls);
     });
     let patternCells = '';
@@ -162,9 +163,12 @@
       return '<div class="mechanism-title">LPS 배열 <span>진접두사 = 접미사인 최대 길이</span></div><div class="lps-track">' + cells + '</div><div class="lps-caption">' + esc(caption) + '</div>';
     }
     const r = step.rolling;
+    const noWindow = trace.text.length < trace.pattern.length;
     let formula = r ? '((' + r.before + ' − ' + r.outgoing + ' × ' + r.high + ') × ' + r.base + ' + ' + r.incoming + ') mod ' + r.mod + ' = ' + r.after : 'h = (h × ' + trace.base + ' + 문자 코드 포인트) mod ' + trace.mod + ' · high = ' + trace.high;
-    if (trace.text.length < trace.pattern.length) formula = '텍스트 길이 < 패턴 길이 · 창 해시를 비교하지 않습니다.';
-    return '<div class="mechanism-title">롤링 해시 <span>b = ' + trace.base + ' · q = ' + trace.mod + ' · high = b^(m−1) mod q</span></div><div class="hash-values"><span>패턴 <strong>' + step.patternHash + '</strong></span><span class="hash-equal">' + (step.patternHash === step.windowHash ? '=' : '≠') + '</span><span>현재 창 <strong>' + step.windowHash + '</strong></span></div><div class="hash-formula">' + esc(formula) + '</div>';
+    if (noWindow) formula = '텍스트 길이 < 패턴 길이 · 창 해시를 비교하지 않습니다.';
+    const comparison = noWindow ? '' : '<span class="hash-equal">' + (step.patternHash === step.windowHash ? '=' : '≠') + '</span>';
+    const windowHash = noWindow ? '—' : step.windowHash;
+    return '<div class="mechanism-title">롤링 해시 <span>b = ' + trace.base + ' · q = ' + trace.mod + ' · high = b^(m−1) mod q</span></div><div class="hash-values"><span>패턴 <strong>' + step.patternHash + '</strong></span>' + comparison + '<span>현재 창 <strong>' + windowHash + '</strong></span></div><div class="hash-formula">' + esc(formula) + '</div>';
   }
 
   function renderVariables(step, trace) {
@@ -267,7 +271,8 @@
       });
     };
     row(trace.text,115,0,'T');row(trace.pattern,180,start,'P');
-    const mechanism=algorithm==='kmp'?'LPS = ['+step.lps.map((v,i)=>i>step.lpsBuiltThrough?'·':v).join(', ')+']':'patternHash = '+step.patternHash+' / windowHash = '+step.windowHash+' / b = '+trace.base+' / q = '+trace.mod;
+    const windowHash = trace.text.length < trace.pattern.length ? '—' : step.windowHash;
+    const mechanism=algorithm==='kmp'?'LPS = ['+step.lps.map((v,i)=>i>step.lpsBuiltThrough?'·':v).join(', ')+']':'patternHash = '+step.patternHash+' / windowHash = '+windowHash+' / b = '+trace.base+' / q = '+trace.mod;
     svg+='<text x="42" y="272" font-size="16">'+esc(mechanism)+'</text>';
     const vars=algorithm==='kmp'?'i = '+step.i+' / j = '+step.j+(step.nextJ!==undefined?' → 다음 i = '+step.nextI+' / 다음 j = '+step.nextJ:''):'start = '+step.start+' / j = '+step.j+' / high = '+step.high;
     svg+='<text x="42" y="306" font-size="13">'+esc(vars)+'</text>';

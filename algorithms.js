@@ -44,9 +44,12 @@
     let len = 0;
     while (k < p.length) {
       const equal = p[k] === p[len];
+      let outcome = '재사용할 접두사가 없으므로 0을 저장합니다.';
+      if (equal) outcome = '같으므로 공통 길이를 늘릴 수 있습니다.';
+      else if (len > 0) outcome = '다르므로 더 짧은 접두사를 확인합니다.';
       stats.preprocessComparisons += 1;
       add('preprocess', 'lpsCompare', '접두사와 접미사 비교',
-        `P[${k}] = '${p[k]}'와 P[${len}] = '${p[len]}'를 비교합니다. ${equal ? '같으므로 공통 길이를 늘릴 수 있습니다.' : '다르므로 더 짧은 접두사를 확인합니다.'}`,
+        `P[${k}] = '${p[k]}'와 P[${len}] = '${p[len]}'를 비교합니다. ${outcome}`,
         { i: k, j: len, equal, activePattern: [k, len] });
       if (equal) {
         len += 1;
@@ -218,7 +221,7 @@
     { id: 'basic', label: '기본 · LPS 재사용', text: 'ABABCABAB', pattern: 'ABAB', base: 256, mod: 101, description: '위치 0과 5에서 발견합니다. KMP의 불일치와 LPS 이동을 관찰하세요.' },
     { id: 'repeat', label: '반복 문자', text: 'AAAAAAAAAB', pattern: 'AAAAB', base: 256, mod: 101, description: '반복되는 A 뒤의 B를 찾습니다. KMP가 i를 유지한 채 j를 바꾸는 이유를 살펴보세요.' },
     { id: 'overlap', label: '겹치는 일치', text: 'ABABABABA', pattern: 'ABA', base: 256, mod: 101, description: '위치 0, 2, 4, 6의 겹치는 일치를 모두 찾습니다.' },
-    { id: 'collision', label: '해시 충돌 실험', text: 'AGAB', pattern: 'AB', base: 256, mod: 5, description: 'q = 5에서는 AG와 AB의 해시가 같습니다. 실제 문자 검증으로 AG를 제외합니다.' },
+    { id: 'collision', label: '해시 충돌 실험', text: 'AGAB', pattern: 'AB', base: 256, mod: 5, description: 'q = 5에서는 AG, GA, AB의 해시가 모두 1입니다. 실제 문자 검증으로 AG와 GA를 제외하고 위치 2의 AB만 기록합니다.' },
     { id: 'missing', label: '일치 없음', text: 'ABCDEABCDE', pattern: 'XYZ', base: 256, mod: 101, description: '문자열에 없는 패턴을 끝까지 검색합니다.' },
     { id: 'unicode', label: '한글 문자열', text: '가나다가나', pattern: '가나', base: 256, mod: 101, description: '한글도 코드 포인트 단위로 비교합니다. 위치 0과 3에서 발견합니다.' }
   ];
